@@ -134,8 +134,12 @@ def net_preloaded(preloaded, input_image, pooling, needs_classifier=False, keep_
     # Classifier
     #####################
     if needs_classifier == True:
-        # Dropout [use value of 50% when training]
-        x = tf.nn.dropout(x, keep_prob)
+        ### MODIFICATION
+        ### We don't want drop out for inference
+        ### keep_prob of 1 === identity node
+
+        ## Dropout [use value of 50% when training]
+        #x = tf.nn.dropout(x, keep_prob)
     
         # Fixed global avg pool/softmax classifier:
         # [227, 227, 3] -> 1000 classes
@@ -208,18 +212,26 @@ def main():
     g = tf.Graph()
     
     # 1st pass - simple classification
-    with g.as_default(), tf.Session(config=config) as sess:
+    with g.as_default(), tf.Session(config=config, graph=g) as sess:
         # Building network
         image = tf.placeholder(dtype=get_dtype_tf(), shape=img_content_shape, name="image_placeholder")
         keep_prob = tf.placeholder(get_dtype_tf())
         sqznet = net_preloaded(data, image, 'max', True, keep_prob)
 
         # Classifying
-        sqznet_results = sqznet['classifier_actv'].eval(feed_dict={image: [preprocess(img_content, sqz_mean)], keep_prob: 1.})[0][0][0]
+        #sqznet_results = sqznet['classifier_actv'].eval(feed_dict={image: [preprocess(img_content, sqz_mean)], keep_prob: 1.})[0][0][0]
+        sqznet_results = sess.run(sqznet['classifier_actv'], feed_dict={image: [preprocess(img_content, sqz_mean)], keep_prob: 1.})[0][0][0]
 
         # Outputting result
         sqz_class = np.argmax(sqznet_results)
         print("\nclass: [%d] '%s' with %5.2f%% confidence" % (sqz_class, classes[sqz_class], sqznet_results[sqz_class] * 100))
+
+        ########################
+        # SavedModel
+        builder = tf.saved_model.builder.SavedModelBuilder('./logSM_modified')
+        builder.add_meta_graph_and_variables(sess, [tf.saved_model.tag_constants.SERVING])
+        builder.save()
+        ########################
 
     if options.fool is not None:
         target_class = options.fool
