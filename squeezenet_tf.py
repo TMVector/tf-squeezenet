@@ -229,7 +229,22 @@ def main():
         ########################
         # SavedModel
         builder = tf.saved_model.builder.SavedModelBuilder('./logSM_modified')
-        builder.add_meta_graph_and_variables(sess, [tf.saved_model.tag_constants.SERVING])
+        builder.add_meta_graph_and_variables(
+            sess, [tf.saved_model.tag_constants.SERVING],
+            signature_def_map={
+                tf.saved_model.signature_constants.DEFAULT_SERVING_SIGNATURE_DEF_KEY:
+                    tf.saved_model.signature_def_utils.build_signature_def(
+                        inputs={
+                            tf.saved_model.signature_constants.PREDICT_INPUTS:
+                                tf.saved_model.utils.build_tensor_info(image)
+                        },
+                        outputs={
+                            tf.saved_model.signature_constants.PREDICT_OUTPUTS:
+                                tf.saved_model.utils.build_tensor_info(sqznet['classifier_actv'])
+                        },
+                        method_name=tf.saved_model.signature_constants.PREDICT_METHOD_NAME
+                    )
+            })
         builder.save()
         ########################
 
